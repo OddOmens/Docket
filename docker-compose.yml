@@ -1,0 +1,44 @@
+# Docket: a self-hosted tracker for the work on all your products.
+#
+#   cp .env.example .env     # optional: change the port or data folder
+#   docker compose up -d --build
+#   docker compose logs docket   # shows the one-time setup code
+#
+# Then open http://127.0.0.1:8200 and create your account with that code.
+# Everything lives in one SQLite database in DOCKET_DATA_DIR: back it up.
+
+name: docket
+
+services:
+  docket:
+    build:
+      context: .
+      args:
+        VERSION: ${DOCKET_VERSION:-dev}
+    image: ghcr.io/oddomens/docket:${DOCKET_VERSION:-latest}
+    restart: unless-stopped
+    user: "${PUID:-1000}:${PGID:-1000}"
+    read_only: true
+    cap_drop: [ALL]
+    security_opt: ["no-new-privileges:true"]
+    environment:
+      DOCKET_LOG_LEVEL: ${DOCKET_LOG_LEVEL:-info}
+      DOCKET_TRASH_DAYS: ${DOCKET_TRASH_DAYS:-30}
+      DOCKET_TRUSTED_PROXIES: ${DOCKET_TRUSTED_PROXIES:-}
+      DOCKET_HOSTS: ${DOCKET_HOSTS:-}
+      # Dates like "today" and "overdue" follow this time zone.
+      TZ: ${TZ:-UTC}
+    volumes:
+      - ${DOCKET_DATA_DIR:-./data}:/data
+    ports:
+      # This machine only by default. Reach it from other devices through
+      # Tailscale Serve or a reverse proxy, or set DOCKET_BIND.
+      - "${DOCKET_BIND:-127.0.0.1}:${DOCKET_PORT:-8200}:8080"
+    mem_limit: 512m
+    pids_limit: 256
+    # Cap the logs so a server left alone for years doesn't fill its disk.
+    logging:
+      driver: json-file
+      options:
+        max-size: "10m"
+        max-file: "3"
